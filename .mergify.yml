@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://docs.mergify.com/configuration/file-format/
+# Central Mergify configuration for the `vyos` GitHub organization.
+#
+# This file lives at vyos/mergify-config:.mergify.yml and is referenced from
+# every vyos/<repo>/.mergify.yml via `extends: mergify-config`.
+#
+# Inheritance semantics (verbatim from docs.mergify.com/configuration/sharing):
+#   1. "The configuration from the specified repository will be loaded and
+#      applied before the one in the current repository." — i.e., this file
+#      (the parent) loads first; the per-repo file (the child) is merged in
+#      afterwards and same-name rules in the child replace the parent's.
+#   2. "Values in the `defaults` and `commands_restrictions` key will be
+#      merged and remote default values will apply to local configuration,
+#      unless a same default value already exist in the local configuration."
+#   3. "Values in the `shared` key will not be merged and shared between
+#      local and remote configurations." — define YAML anchors locally only.
+
+pull_request_rules:
+  - name: Label conflicting pull requests
+    description: Add a label to a pull request with conflict to spot it easily
+    conditions:
+      - conflict
+      - '-closed'
+    actions:
+      label:
+        toggle:
+          - conflicts
+
+commands_restrictions:
+  backport: &allowed
+    conditions:
+      - or:
+        - sender=@vyos/maintainers
+        - sender=vyosbot
+  copy: *allowed
+  dequeue: *allowed
+  queue: *allowed
+  rebase: *allowed
+  refresh: *allowed
+  requeue: *allowed
+  squash: *allowed
+  update: *allowed
