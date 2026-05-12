@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://docs.mergify.com/configuration/file-format/
 # Central Mergify configuration for the `vyos` GitHub organization.
 #
-# This file lives at vyos/mergify-config:.mergify.yml and is referenced from
-# every vyos/<repo>/.mergify.yml via `extends: mergify-config`.
+# This file lives at vyos/mergify:.mergify.yml and is referenced from
+# every vyos/<repo>/.mergify.yml via `extends: mergify`.
 #
 # Inheritance semantics (verbatim from docs.mergify.com/configuration/sharing):
 #   1. "The configuration from the specified repository will be loaded and
@@ -14,6 +14,25 @@
 #      unless a same default value already exist in the local configuration."
 #   3. "Values in the `shared` key will not be merged and shared between
 #      local and remote configurations." — define YAML anchors locally only.
+
+defaults:
+  actions:
+    backport:
+      # Fail the backport loudly on conflict instead of committing literal
+      # git conflict markers (<<<<<<< / ======= / >>>>>>>) into the destination
+      # branch and opening a PR labeled `conflicts`. With this set to false,
+      # Mergify posts an error comment on the source PR and creates no
+      # destination PR — the operator handles the conflict manually.
+      #
+      # Incident driving this default (2026-05-12):
+      # vyos/vyos-documentation#1994 was backported via `@Mergifyio backport
+      # sagitta circinus`. Cherry-pick conflicted in docs/conf.py; Mergify's
+      # default (ignore_conflicts: true) committed the markers, the resulting
+      # PRs (#1998, #1999) were merged anyway, and RTD builds on both branches
+      # failed with `SyntaxError: invalid syntax (conf.py)`. Fix-forwards
+      # #2000 (circinus) and #2001 (sagitta) removed the markers and
+      # re-applied the patch correctly.
+      ignore_conflicts: false
 
 pull_request_rules:
   - name: Label conflicting pull requests
