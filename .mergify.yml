@@ -94,6 +94,29 @@ pull_request_rules:
         toggle:
           - invalid-commit-title
 
+  # ------------------------------------------------------------------
+  # Branch cleanup — auto-delete merged PR source branches.
+  #
+  # Skips the long-lived release-train and working branches so an
+  # inter-branch merge (e.g. a forward-port from `circinus` into
+  # `current`, or any `main`/`production` → working-branch sync PR)
+  # can never nuke a working branch as a side effect of merging.
+  #
+  # `delete_head_branch` is already a no-op against:
+  #   - fork-head PRs (cross-repo head, no permission to delete)
+  #   - branches still referenced as the base of another open PR
+  # ------------------------------------------------------------------
+
+  - name: Delete head branch after merge
+    description: >
+      Delete the source branch once its PR is merged, except for
+      long-lived release-train and working branches.
+    conditions:
+      - merged
+      - '-head~=^(current|rolling|sagitta|circinus|crux|equuleus|production|main|master|develop|staging|git-actions|vyos\.dev)$'
+    actions:
+      delete_head_branch:
+
 commands_restrictions:
   backport: &allowed
     conditions:
