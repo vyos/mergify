@@ -1,0 +1,110 @@
+# yaml-language-server: $schema=https://docs.mergify.com/configuration/file-format/
+# Central Mergify configuration for the `vyos` GitHub organization.
+#
+# This file lives at vyos/mergify:.mergify.yml and is referenced from
+# every vyos/<repo>/.mergify.yml via `extends: mergify`.
+#
+# Inheritance semantics (verbatim from docs.mergify.com/configuration/sharing):
+#   1. "The configuration from the specified repository will be loaded and
+#      applied before the one in the current repository." — i.e., this file
+#      (the parent) loads first; the per-repo file (the child) is merged in
+#      afterwards and same-name rules in the child replace the parent's.
+#   2. "Values in the `defaults` and `commands_restrictions` key will be
+#      merged and remote default values will apply to local configuration,
+#      unless a same default value already exist in the local configuration."
+#   3. "Values in the `shared` key will not be merged and shared between
+#      local and remote configurations." — define YAML anchors locally only.
+
+defaults:
+  actions:
+    backport:
+      # Fail the backport loudly on conflict instead of committing literal
+      # git conflict markers (<<<<<<< / ======= / >>>>>>>) into the destination
+      # branch and opening a PR labeled `conflicts`. With this set to false,
+      # Mergify posts an error comment on the source PR and creates no
+      # destination PR — the operator handles the conflict manually.
+      #
+      # Incident driving this default (2026-05-12):
+      # vyos/vyos-documentation#1994 was backported via `@Mergifyio backport
+      # sagitta circinus`. Cherry-pick conflicted in docs/conf.py; Mergify's
+      # default (ignore_conflicts: true) committed the markers, the resulting
+      # PRs (#1998, #1999) were merged anyway, and RTD builds on both branches
+      # failed with `SyntaxError: invalid syntax (conf.py)`. Fix-forwards
+      # #2000 (circinus) and #2001 (sagitta) removed the markers and
+      # re-applied the patch correctly.
+      ignore_conflicts: false
+
+pull_request_rules:
+  - name: Label conflicting pull requests
+    description: Add a label to a pull request with conflict to spot it easily
+    conditions:
+      - conflict
+      - '-closed'
+    actions:
+      label:
+        toggle:
+          - conflicts
+
+  # ------------------------------------------------------------------
+  # PR-message format rules — replaces vyos/.github:check-pr-message.yml
+  #
+  # Title and every commit's first line must follow:
+  #   [optional `scope: ` prefix] T<digits>: <text>
+  # Examples:
+  #   T99999: make IPsec secure
+  #   dhcpv6: T8849: Add time-zone support for Kea DHCPv6
+  #
+  # The valid-form pattern:
+  #   ^(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+.*
+  #
+  # Mergify exposes only `commit_message` (full message, not headline-only),
+  # but the default Python `re` flags make `^` = start-of-string and `.*`
+  # non-newline-matching, so `^<pattern>` effectively checks the first line
+  # — equivalent to the original GHA's `messageHeadline` check.
+  #
+  # Because `commits[*]` returns true if ANY commit matches, and there is no
+  # `!~=` operator, the commit-message rule uses a negative-lookahead regex
+  # that matches when at least one commit's first line does NOT conform.
+  # ------------------------------------------------------------------
+
+  - name: Flag PR title not matching T-ID format
+    description: >
+      PR title must be `T<digits>: <text>`, optionally prefixed with `scope: `.
+      Replaces the title half of vyos/.github:check-pr-message.yml.
+    conditions:
+      - '-closed'
+      - '-merged'
+      - '-title~=^(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+.*'
+    actions:
+      label:
+        toggle:
+          - invalid-title
+
+  - name: Flag commit message not matching T-ID format
+    description: >
+      Each commit's first line must match `T<digits>: <text>`, optionally
+      prefixed with `scope: `. Replaces the commit-message half of
+      vyos/.github:check-pr-message.yml.
+    conditions:
+      - '-closed'
+      - '-merged'
+      - 'commits[*].commit_message~=^(?!(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+).*'
+    actions:
+      label:
+        toggle:
+          - invalid-commit-title
+
+commands_restrictions:
+  backport: &allowed
+    conditions:
+      - or:
+        - sender=@vyos/maintainers
+        - sender=vyosbot
+  copy: *allowed
+  dequeue: *allowed
+  queue: *allowed
+  rebase: *allowed
+  refresh: *allowed
+  requeue: *allowed
+  squash: *allowed
+  update: *allowed
