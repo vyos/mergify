@@ -46,9 +46,9 @@ pull_request_rules:
           - conflicts
 
   # ------------------------------------------------------------------
-  # PR-message format rules — replaces vyos/.github:check-pr-message.yml
+  # PR-message format rule — replaces vyos/.github:check-pr-message.yml
   #
-  # Title and every commit's first line must follow:
+  # PR title AND every commit's first line must follow:
   #   [optional `scope: ` prefix] T<digits>: <text>
   # Examples:
   #   T99999: make IPsec secure
@@ -63,36 +63,28 @@ pull_request_rules:
   # — equivalent to the original GHA's `messageHeadline` check.
   #
   # Because `commits[*]` returns true if ANY commit matches, and there is no
-  # `!~=` operator, the commit-message rule uses a negative-lookahead regex
+  # `!~=` operator, the commit-message half uses a negative-lookahead regex
   # that matches when at least one commit's first line does NOT conform.
+  #
+  # Title and commit-message checks live in a single rule with an `or`
+  # condition so a single `toggle: invalid-title` action manages the label
+  # in both directions. Two separate `toggle` rules pointing at the same
+  # label would issue conflicting add/remove operations when one surface
+  # conforms and the other does not (mergify#4 review): Mergify's `toggle`
+  # docs frame the action as a single-rule pattern that subsumes the
+  # earlier two-rule add/remove-with-inverse-conditions idiom.
   # ------------------------------------------------------------------
 
-  - name: Flag PR title not matching T-ID format
+  - name: Flag T-ID format violation in PR title or commit messages
     description: >
-      PR title must be `T<digits>: <text>`, optionally prefixed with `scope: `.
-      Replaces the title half of vyos/.github:check-pr-message.yml.
+      PR title and every commit's first line must match `T<digits>: <text>`,
+      optionally prefixed with `scope: `. Replaces vyos/.github:check-pr-message.yml.
     conditions:
       - '-closed'
       - '-merged'
-      - '-title~=^(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+.*'
-    actions:
-      label:
-        toggle:
-          - invalid-title
-
-  - name: Flag commit message not matching T-ID format
-    description: >
-      Each commit's first line must match `T<digits>: <text>`, optionally
-      prefixed with `scope: `. Replaces the commit-message half of
-      vyos/.github:check-pr-message.yml. Shares the `invalid-title` label
-      with the title rule — both surfaces fail the same headline regex, so
-      splitting into two labels (`invalid-title` + `invalid-commit-title`)
-      was noise; the rule name still tells the operator which surface
-      tripped.
-    conditions:
-      - '-closed'
-      - '-merged'
-      - 'commits[*].commit_message~=^(?!(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+).*'
+      - or:
+          - '-title~=^(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+.*'
+          - 'commits[*].commit_message~=^(?!(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+).*'
     actions:
       label:
         toggle:
