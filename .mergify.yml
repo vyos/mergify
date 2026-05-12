@@ -45,6 +45,55 @@ pull_request_rules:
         toggle:
           - conflicts
 
+  # ------------------------------------------------------------------
+  # PR-message format rules — replaces vyos/.github:check-pr-message.yml
+  #
+  # Title and every commit's first line must follow:
+  #   [optional `scope: ` prefix] T<digits>: <text>
+  # Examples:
+  #   T99999: make IPsec secure
+  #   dhcpv6: T8849: Add time-zone support for Kea DHCPv6
+  #
+  # The valid-form pattern:
+  #   ^(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+.*
+  #
+  # Mergify exposes only `commit_message` (full message, not headline-only),
+  # but the default Python `re` flags make `^` = start-of-string and `.*`
+  # non-newline-matching, so `^<pattern>` effectively checks the first line
+  # — equivalent to the original GHA's `messageHeadline` check.
+  #
+  # Because `commits[*]` returns true if ANY commit matches, and there is no
+  # `!~=` operator, the commit-message rule uses a negative-lookahead regex
+  # that matches when at least one commit's first line does NOT conform.
+  # ------------------------------------------------------------------
+
+  - name: Flag PR title not matching T-ID format
+    description: >
+      PR title must be `T<digits>: <text>`, optionally prefixed with `scope: `.
+      Replaces the title half of vyos/.github:check-pr-message.yml.
+    conditions:
+      - '-closed'
+      - '-merged'
+      - '-title~=^(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+.*'
+    actions:
+      label:
+        toggle:
+          - invalid-title
+
+  - name: Flag commit message not matching T-ID format
+    description: >
+      Each commit's first line must match `T<digits>: <text>`, optionally
+      prefixed with `scope: `. Replaces the commit-message half of
+      vyos/.github:check-pr-message.yml.
+    conditions:
+      - '-closed'
+      - '-merged'
+      - 'commits[*].commit_message~=^(?!(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+).*'
+    actions:
+      label:
+        toggle:
+          - invalid-commit-title
+
 commands_restrictions:
   backport: &allowed
     conditions:
