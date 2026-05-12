@@ -84,7 +84,11 @@ pull_request_rules:
     description: >
       Each commit's first line must match `T<digits>: <text>`, optionally
       prefixed with `scope: `. Replaces the commit-message half of
-      vyos/.github:check-pr-message.yml.
+      vyos/.github:check-pr-message.yml. Shares the `invalid-title` label
+      with the title rule — both surfaces fail the same headline regex, so
+      splitting into two labels (`invalid-title` + `invalid-commit-title`)
+      was noise; the rule name still tells the operator which surface
+      tripped.
     conditions:
       - '-closed'
       - '-merged'
@@ -92,7 +96,7 @@ pull_request_rules:
     actions:
       label:
         toggle:
-          - invalid-commit-title
+          - invalid-title
 
 commands_restrictions:
   backport: &allowed
