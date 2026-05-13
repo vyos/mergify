@@ -34,6 +34,81 @@ defaults:
       # re-applied the patch correctly.
       ignore_conflicts: false
 
+  # ------------------------------------------------------------------
+  # Fleet-wide queue defaults (kick-off meeting 2026-05-13).
+  #
+  # These values are INERT until a consumer (or a future central rule)
+  # defines a concrete entry under `queue_rules:`. Mergify's inheritance
+  # semantics (https://docs.mergify.com/configuration/sharing) field-merge
+  # `defaults:` between parent and child, so a consumer can override any
+  # single value below without redefining the whole queue.
+  #
+  # Why these specific defaults:
+  #   - update_method: rebase  -- keep enqueued PRs up to date by rebasing
+  #     on base, not merging base into the branch. Avoids the noisy
+  #     "Merge branch 'current' into <pr>" commits the manual flow creates
+  #     today and addresses Alex's ask in the kick-off meeting about auto-
+  #     rebasing PRs when other PRs land first.
+  #   - merge_method: merge    -- preserve PR boundaries via a merge commit
+  #     while individual commits remain linear on the base branch (the
+  #     semi-linear pattern described at
+  #     https://docs.mergify.com/merge-queue/merge-strategies).
+  #   - batch_size: 1          -- one PR per speculative check. Start
+  #     conservative; revisit per-repo once Yuriy + maintainers have
+  #     observed real queue behavior in the first opt-in consumer.
+  #
+  # No `queue_rules:` block is declared in this central file yet — that is
+  # deliberate. The kick-off meeting framed merge queue rollout as
+  # "preparation, gather feedback, iterate." Defining a concrete
+  # `queue_rules:` entry centrally would silently enable `@Mergifyio queue`
+  # for every consumer of `extends: mergify` (currently 2; T8852 fleet
+  # migration target is ~27). The first opt-in repo should declare its own
+  # `queue_rules:` in its per-repo `.github/mergify.yml`, picking up the
+  # defaults below; once we have one round of real feedback, the queue
+  # shape can graduate to central.
+  # ------------------------------------------------------------------
+  queue_rule:
+    update_method: rebase
+    merge_method: merge
+    batch_size: 1
+
+# ------------------------------------------------------------------
+# Backport target label vocabulary (kick-off meeting 2026-05-13).
+#
+# Christian's ask: hold a backport on a merged PR until the target
+# release tag exists (so e.g. a fix can be queued for 1.5.2 while 1.5.1
+# is still pending). Mergify has no native "wait for git tag" condition,
+# so the deferred-backport workflow is implemented externally (a GitHub
+# Action triggered on `release.published` / `push: tags` that resolves
+# the right label and posts `@Mergifyio backport <branch>` as a comment).
+#
+# This is the canonical label-to-branch mapping the external automation
+# consumes. The labels themselves are NOT auto-created by Mergify — each
+# repo provisions them through its own label-management (org-level
+# label-sync, repo settings, or a one-off `gh label create` sweep).
+#
+#   Label                       Backport branch     VyOS release line
+#   --------------------------  ------------------  ------------------
+#   backport/sagitta            sagitta             1.4.x (LTS)
+#   backport/circinus           circinus            1.5.x
+#   backport/equuleus           equuleus            1.6.x
+#   backport/crux               crux                1.3.x (legacy)
+#
+# Convention for the source PR maintainer:
+#   - "Backport now" (today's behavior): post `@Mergifyio backport
+#     <branch>` after merge. Restricted to @vyos/maintainers + vyosbot
+#     via `commands_restrictions` below.
+#   - "Backport when target tag exists" (deferred): apply the
+#     `backport/<branch>` label on the source PR before or at merge.
+#     The external GH Action resolves it on the next release event.
+#
+# Once the deferred workflow lands, a `pull_request_rules` entry here
+# (e.g. label-driven backport with `conditions: label = backport/...`)
+# would be the wrong primitive — by then the GH Action drives the
+# `@Mergifyio backport` comment directly. Documenting the vocabulary
+# here is the durable part.
+# ------------------------------------------------------------------
+
 pull_request_rules:
   - name: Label conflicting pull requests
     description: Add a label to a pull request with conflict to spot it easily
@@ -89,6 +164,38 @@ pull_request_rules:
       label:
         toggle:
           - invalid-title
+
+# ------------------------------------------------------------------
+# Intended initial `queue_rules:` shape (kick-off meeting 2026-05-13).
+#
+# NOT enabled centrally. Per `defaults.queue_rule:` above, this shape
+# is the convention; the first opt-in consumer declares its own
+# `queue_rules:` block in its per-repo `.github/mergify.yml` (inheriting
+# the defaults), validates behavior on real PRs, and only then does the
+# definition graduate to this central file.
+#
+# Reference shape, copy-paste into the consumer's child config:
+#
+#   queue_rules:
+#     - name: default
+#       # Inherit update_method, merge_method, batch_size from
+#       # `defaults.queue_rule:` in vyos/mergify:.mergify.yml.
+#       merge_conditions:
+#         - '-conflict'           # not currently in conflict
+#         - '-draft'              # not a draft
+#         - '-label=invalid-title' # passes the central T-ID format rule
+#         - '-label=do-not-merge' # explicit human block; reserved vocab
+#         # Per-repo CI checks go here, e.g.:
+#         # - check-success=build
+#         # - check-success=test
+#         # - "#approved-reviews-by>=1"
+#
+# Activation requires either:
+#   - a `pull_request_rules` entry with `actions: queue: name: default`
+#     (label-driven activation, e.g. `conditions: label = queue`), OR
+#   - a maintainer posting `@Mergifyio queue` on the PR (already gated
+#     by `commands_restrictions.queue` below; no extra gate needed).
+# ------------------------------------------------------------------
 
 commands_restrictions:
   # Both Maintainers teams are listed for defense-in-depth.
