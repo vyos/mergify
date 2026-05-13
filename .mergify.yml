@@ -91,10 +91,33 @@ pull_request_rules:
           - invalid-title
 
 commands_restrictions:
+  # Both Maintainers teams are listed for defense-in-depth.
+  #
+  # This file is consumed by vyos/* repos via the org-local
+  # `extends: mergify` (which resolves to vyos/mergify within the vyos
+  # org). On a vyos repo PR, `@vyos/maintainers` is the local team and
+  # matches normally; `@VyOS-Networks/maintainers` is cross-org and
+  # evaluates to a non-match (Mergify surfaces it as
+  # "Team @VyOS-Networks/maintainers is not part of the organization
+  # vyos") — but does not fail the `or:` rule, so any of the remaining
+  # branches can still match.
+  #
+  # The defense-in-depth case is the cross-org mirror pipeline: if this
+  # file (or any per-repo file copying these conditions) is ever
+  # replicated byte-for-byte to a VyOS-Networks repo without being
+  # migrated to `extends:`, the `@VyOS-Networks/maintainers` entry
+  # ensures VyOS-Networks Maintainers can still issue Mergify commands
+  # on the mirrored PR.
+  #
+  # See VyOS-Networks/vyatta-cfg#33 for the incident that motivated
+  # listing both teams: the T8531 predecessor inline config (single
+  # team, `@vyos/maintainers`) was mirrored to VyOS-Networks/vyatta-cfg
+  # and rejected `@Mergifyio backport` from a VyOS-Networks Maintainer.
   backport: &allowed
     conditions:
       - or:
         - sender=@vyos/maintainers
+        - sender=@VyOS-Networks/maintainers
         - sender=vyosbot
   copy: *allowed
   dequeue: *allowed
