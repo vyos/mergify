@@ -18,21 +18,52 @@
 defaults:
   actions:
     backport:
-      # Fail the backport loudly on conflict instead of committing literal
-      # git conflict markers (<<<<<<< / ======= / >>>>>>>) into the destination
-      # branch and opening a PR labeled `conflicts`. With this set to false,
-      # Mergify posts an error comment on the source PR and creates no
-      # destination PR — the operator handles the conflict manually.
+      # Create the backport PR even when the cherry-pick conflicts. Mergify
+      # commits the literal conflict markers (<<<<<<< / ======= / >>>>>>>)
+      # into the destination branch, opens the PR, applies the
+      # `backport-conflict` label, and assigns the source PR author. The PR
+      # is the workspace where the conflict gets resolved: the assignee pushes
+      # a resolution commit onto the same branch, CI flips green, Mergify
+      # merges.
       #
-      # Incident driving this default (2026-05-12):
+      # `label_conflicts` fires ONLY on backport (cherry-pick) conflicts.
+      # The separate `Label conflicting pull requests` rule below (predicate:
+      # `conflict`) fires on base-branch merge conflicts and would NOT catch
+      # this case — cherry-pick conflict markers live in committed content,
+      # not as unmerged paths, so the `conflict` attribute stays false. The
+      # two labels are intentionally distinct (`backport-conflict` vs
+      # `conflicts`) so triage can tell them apart.
+      #
+      # Why the explicit `{{ author }}` assignment: a labeled-but-unassigned
+      # PR is easy to overlook. Pinging the source PR author closes the
+      # accountability loop — they wrote the change, they know what the
+      # backport should look like.
+      #
+      # Operational caveat — the label DOES NOT block merge by itself. The
+      # 2026-05-12 incident below shipped because branch protection did not
+      # require a check that catches conflict markers. Repos consuming
+      # `extends: mergify` need either (a) a required CI status that fails
+      # on `<<<<<<<` in tracked files, or (b) a branch-protection ruleset
+      # that forbids merging while `backport-conflict` is present. Both
+      # belong to fleet-wide governance, tracked under T8850 (Cat 1 branch
+      # governance rulesets) rather than this central-config repo.
+      #
+      # Incident history (2026-05-12):
       # vyos/vyos-documentation#1994 was backported via `@Mergifyio backport
       # sagitta circinus`. Cherry-pick conflicted in docs/conf.py; Mergify's
       # default (ignore_conflicts: true) committed the markers, the resulting
       # PRs (#1998, #1999) were merged anyway, and RTD builds on both branches
       # failed with `SyntaxError: invalid syntax (conf.py)`. Fix-forwards
       # #2000 (circinus) and #2001 (sagitta) removed the markers and
-      # re-applied the patch correctly.
-      ignore_conflicts: false
+      # re-applied the patch correctly. A prior flip to `ignore_conflicts:
+      # false` stopped silent merges but eliminated the in-PR workspace,
+      # leaving operators with no place to resolve the conflict — this
+      # config restores the workspace while adding the label + assignee so
+      # the conflicted PR is impossible to miss in triage.
+      ignore_conflicts: true
+      label_conflicts: backport-conflict
+      assignees:
+        - "{{ author }}"
 
 pull_request_rules:
   - name: Label conflicting pull requests
