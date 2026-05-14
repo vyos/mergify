@@ -197,5 +197,7 @@ merge_protections:
       Block merge while the backport-conflict label is present. The label
       is auto-applied by the backport action on cherry-pick conflicts and
       must be manually removed after the conflict is resolved in the PR.
+    if:
+      - label = backport-conflict
     success_conditions:
       - label != backport-conflict
