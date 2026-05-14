@@ -129,6 +129,50 @@ pull_request_rules:
         toggle:
           - invalid-title
 
+  # ------------------------------------------------------------------
+  # Opt-in auto-update — refresh PR with base when it falls behind.
+  #
+  # Uses the `update` action (merges base into PR via merge commit), NOT
+  # `rebase`. Three reasons for the choice in this environment:
+  #
+  #   1. `update` works on fork PRs indefinitely; `rebase` loses fork
+  #      support after 2026-07-01 per Mergify docs. We get fork PRs on
+  #      vyos/vyos-1x, vyos/vyos-documentation, and a few others.
+  #
+  #   2. `update` does NOT rewrite commit SHAs. The gen-1 cross-org
+  #      mirror pipeline (vyos/* → VyOS-Networks/*) copies refs by SHA;
+  #      a force-pushed rebase would create mirror noise at best and
+  #      break consumer PRs at worst. `update` preserves SHAs.
+  #
+  #   3. `update` is cheaper for CI — one new merge commit triggers one
+  #      re-run; rebase changes every SHA and re-runs the entire PR.
+  #
+  # Opt-in via the `auto-update` label so this is per-PR (or per-repo
+  # via default-label automation) rather than a fleet-wide behavior
+  # change. Repos that want it apply the label; repos that don't,
+  # ignore the rule.
+  #
+  # Skipped on `backport-conflict` — we don't want to auto-update a PR
+  # whose conflict workspace is mid-resolution. Skipped on draft PRs
+  # and PRs already in merge-conflict with base (the existing
+  # `conflicts` label rule above flags those for human attention).
+  # ------------------------------------------------------------------
+  - name: Auto-update PR when behind base (opt-in via label)
+    description: >
+      Merge base branch into PR via `update` action when the PR carries
+      the `auto-update` label and has at least one commit behind base.
+      Preserves SHAs (fork-safe, mirror-safe, CI-cache-friendly).
+    conditions:
+      - label=auto-update
+      - '#commits-behind>0'
+      - '-draft'
+      - '-closed'
+      - '-merged'
+      - '-conflict'
+      - '-label=backport-conflict'
+    actions:
+      update: {}
+
 commands_restrictions:
   # Both Maintainers teams are listed for defense-in-depth.
   #
