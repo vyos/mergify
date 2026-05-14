@@ -18,21 +18,60 @@
 defaults:
   actions:
     backport:
-      # Fail the backport loudly on conflict instead of committing literal
-      # git conflict markers (<<<<<<< / ======= / >>>>>>>) into the destination
-      # branch and opening a PR labeled `conflicts`. With this set to false,
-      # Mergify posts an error comment on the source PR and creates no
-      # destination PR — the operator handles the conflict manually.
+      # Create the backport PR even when the cherry-pick conflicts. Mergify
+      # commits the literal conflict markers (<<<<<<< / ======= / >>>>>>>)
+      # into the destination branch, opens the PR, applies the
+      # `backport-conflict` label, and assigns the source PR author. The PR
+      # is the workspace where the conflict gets resolved: the assignee pushes
+      # a resolution commit onto the same branch, CI flips green, Mergify
+      # merges.
       #
-      # Incident driving this default (2026-05-12):
+      # `label_conflicts` fires ONLY on backport (cherry-pick) conflicts.
+      # The separate `Label conflicting pull requests` rule below (predicate:
+      # `conflict`) fires on base-branch merge conflicts and would NOT catch
+      # this case — cherry-pick conflict markers live in committed content,
+      # not as unmerged paths, so the `conflict` attribute stays false. The
+      # two labels are intentionally distinct (`backport-conflict` vs
+      # `conflicts`) so triage can tell them apart.
+      #
+      # Why the explicit `{{ author }}` assignment: a labeled-but-unassigned
+      # PR is easy to overlook. Pinging the source PR author closes the
+      # accountability loop — they wrote the change, they know what the
+      # backport should look like.
+      #
+      # Merge is blocked while the label is present — see the
+      # `merge_protections` block at the bottom of this file. Mergify
+      # documents that merge_protections are "safe to edit live;
+      # re-evaluations happen automatically", so a PR that gains the
+      # label after queueing will fail the merge check at the next
+      # evaluation. Active ejection of a queued PR vs. holding it
+      # indefinitely is not explicitly documented; manual fallback is
+      # `@Mergifyio dequeue` (allowed to Maintainers per
+      # commands_restrictions below).
+      #
+      # This does NOT replace branch protection. A determined operator can
+      # still bypass via the GitHub "Merge" button if branch protection
+      # doesn't require Mergify checks. The defense-in-depth piece (required
+      # CI status that fails on `<<<<<<<` in tracked files, or branch-
+      # protection ruleset on the label) is tracked under T8850 (Cat 1
+      # branch governance rulesets).
+      #
+      # Incident history (2026-05-12):
       # vyos/vyos-documentation#1994 was backported via `@Mergifyio backport
       # sagitta circinus`. Cherry-pick conflicted in docs/conf.py; Mergify's
       # default (ignore_conflicts: true) committed the markers, the resulting
       # PRs (#1998, #1999) were merged anyway, and RTD builds on both branches
       # failed with `SyntaxError: invalid syntax (conf.py)`. Fix-forwards
       # #2000 (circinus) and #2001 (sagitta) removed the markers and
-      # re-applied the patch correctly.
-      ignore_conflicts: false
+      # re-applied the patch correctly. A prior flip to `ignore_conflicts:
+      # false` stopped silent merges but eliminated the in-PR workspace,
+      # leaving operators with no place to resolve the conflict — this
+      # config restores the workspace while adding the label + assignee so
+      # the conflicted PR is impossible to miss in triage.
+      ignore_conflicts: true
+      label_conflicts: backport-conflict
+      assignees:
+        - "{{ author }}"
 
 pull_request_rules:
   - name: Label conflicting pull requests
@@ -127,3 +166,38 @@ commands_restrictions:
   requeue: *allowed
   squash: *allowed
   update: *allowed
+
+merge_protections:
+  # Block merge while the backport-conflict label is set on a PR. The
+  # `backport` action above adds this label whenever a backport cherry-pick
+  # produces conflict markers; this rule ensures the conflicted PR cannot
+  # proceed to merge until a human removes the label (which they should
+  # only do after pushing a resolution commit that overwrites the markers).
+  #
+  # Why merge_protections and not a pull_request_rules `dequeue` action:
+  # Mergify exposes `dequeue` as a user-facing slash command and as a key
+  # under `commands_restrictions`, but NOT as a YAML action in
+  # pull_request_rules. `merge_protections` is the declarative equivalent —
+  # a PR with the label fails the success_conditions and is held back from
+  # merge; manual `@Mergifyio dequeue` remains available as the escape
+  # hatch (allowed to Maintainers per commands_restrictions above).
+  #
+  # Inheritance: per Mergify docs, merge_protections from `extends:`
+  # merges across parent and child, with same-named rules in the child
+  # overriding the parent. Consumer repos can disable this rule by
+  # defining a same-named rule locally with weaker conditions.
+  #
+  # Caveat: merge_protections only governs Mergify-driven merges. A
+  # determined operator can still click GitHub's merge button if branch
+  # protection doesn't require Mergify checks. Defense-in-depth (required
+  # CI status, branch-protection ruleset on the label) is tracked under
+  # T8850 Cat 1 branch governance.
+  - name: backport-conflict label must be absent to merge
+    description: >
+      Block merge while the backport-conflict label is present. The label
+      is auto-applied by the backport action on cherry-pick conflicts and
+      must be manually removed after the conflict is resolved in the PR.
+    if:
+      - label = backport-conflict
+    success_conditions:
+      - label != backport-conflict
