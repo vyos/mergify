@@ -223,9 +223,9 @@ commands_restrictions:
 #
 # Syntax (any of the following, repeated as needed in the PR body):
 #
-#   Depends-On: #42                                       # same-repo
-#   Depends-On: vyos/vyos-1x#5191                         # cross-repo
-#   Depends-On: https://github.com/vyos/vyos-1x/pull/5191 # full URL
+#   Depends-On: #42                                  # same-repo
+#   Depends-On: owner/repo#42                        # qualified, same org
+#   Depends-On: https://github.com/owner/repo/pull/42 # full URL
 #
 # Constraints (from Mergify built-in-protections docs):
 #   - The referenced PR must live in a repository where Mergify is
