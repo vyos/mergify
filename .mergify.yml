@@ -211,6 +211,49 @@ commands_restrictions:
   squash: *allowed
   update: *allowed
 
+# ------------------------------------------------------------------
+# Same-repo (and cross-repo, same-org) PR dependencies — `Depends-On:`
+# keyword in PR body.
+#
+# Mergify ships a built-in merge protection that reads `Depends-On:`
+# lines from the PR description and blocks merge until every referenced
+# PR has merged. The protection is always on — no YAML required to
+# enable it. This block exists so contributors reading the central
+# config can find the feature.
+#
+# Syntax (any of the following, repeated as needed in the PR body):
+#
+#   Depends-On: #42                                       # same-repo
+#   Depends-On: vyos/vyos-1x#5191                         # cross-repo
+#   Depends-On: https://github.com/vyos/vyos-1x/pull/5191 # full URL
+#
+# Constraints (from Mergify built-in-protections docs):
+#   - The referenced PR must live in a repository where Mergify is
+#     enabled and that belongs to the same GitHub organization. Both
+#     vyos/* and VyOS-Networks/* have the Mergify app installed with
+#     `repository_selection: all`, so any repo in either org qualifies.
+#   - Self-references and cycles are silently ignored.
+#   - When dependencies target different branches, `@Mergifyio refresh`
+#     may be required to re-evaluate protections (per Mergify docs).
+#
+# Merge-queue interaction (theoretical — no consumer repo in either
+# org defines `queue_rules` as of 2026-05-15):
+#   - When a repo adopts the merge queue, the built-in protection
+#     composes with that repo's `queue_rules.queue_conditions`: a PR
+#     with an unmet dependency stays out of the queue.
+#   - Stacked PRs (each PR's base = previous PR's head AND each PR
+#     carries `Depends-On: #N` for the previous) are auto-detected by
+#     the queue and merged in order against the stack root. The
+#     `Depends-On:` marker is load-bearing — without it the PRs queue
+#     independently.
+#
+# No condition attribute exposes whether a declared dependency is
+# satisfied; that state lives inside the built-in protection. The
+# `depends-on` attribute on a PR is the list of declared references,
+# not their merged state — do not write `pull_request_rules` that try
+# to label PRs by dependency satisfaction.
+# ------------------------------------------------------------------
+
 merge_protections:
   # Block merge while the backport-conflict label is set on a PR. The
   # `backport` action above adds this label whenever a backport cherry-pick
