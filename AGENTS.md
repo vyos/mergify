@@ -2,7 +2,7 @@
 
 ## Project purpose
 
-Central [Mergify](https://mergify.com/) configuration baseline for the `vyos` (public) GitHub organisation. `.mergify.yml` here is referenced from every `vyos/<repo>/.mergify.yml` via `extends: mergify`. Holds shared defaults (notably `defaults.actions.backport.ignore_conflicts: false`), shared commands restrictions, and the PR title + commit-message format rule that replaces the GHA `check-pr-message.yml` workflow.
+Central [Mergify](https://mergify.com/) configuration baseline for the `vyos` (public) GitHub organisation. `.mergify.yml` here is referenced from every `vyos/<repo>/.mergify.yml` via `extends: mergify`. Holds shared defaults (notably `defaults.actions.backport.ignore_conflicts: true` with conflict labelling and author assignment), shared commands restrictions, and the PR title + commit-message format rule that replaces the GHA `check-pr-message.yml` workflow.
 
 Sibling — **not** twin — of [VyOS-Networks/mergify](https://github.com/VyOS-Networks/mergify). The two repos diverge in the PR-message rule shape and per-org annotations (see "Cross-repo context"); never blindly mirror changes across.
 
@@ -35,7 +35,7 @@ No local execution. Validate edits with `yaml-language-server` (honours the in-f
 
 - Default branch: `production`. Visibility: public.
 - Commit / PR title format: `T<num>: <description>` (or `scope: T<num>: <description>`); this very rule is enforced by the rule defined in this file.
-- `defaults.actions.backport.ignore_conflicts: false` is intentional — Mergify must fail loudly on backport conflicts rather than committing literal git conflict markers. Driving incident: backport of vyos/vyos-documentation#1994 (2026-05-12).
+- `defaults.actions.backport.ignore_conflicts: true` with `label_conflicts: backport-conflict` and `assignees: ["{{ author }}"]` — Mergify opens a conflict-workspace PR, applies the `backport-conflict` label, and assigns the source author for resolution. Silent merge is blocked via `merge_protections`. `ignore_conflicts: false` was tried first but eliminated the in-PR workspace; the current shape restores it while making the conflict impossible to miss. Driving incident: backport of vyos/vyos-documentation#1994 (2026-05-12).
 - Any change merged to `production` affects every consumer's next Mergify event immediately. No staging.
 
 ## Notes for future contributors
