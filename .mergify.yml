@@ -199,9 +199,9 @@ commands_restrictions:
   backport: &allowed
     conditions:
       - or:
-        - sender=@vyos/maintainers
-        - sender=@VyOS-Networks/maintainers
-        - sender=vyosbot
+          - sender=@vyos/maintainers
+          - sender=@VyOS-Networks/maintainers
+          - sender=vyosbot
   copy: *allowed
   dequeue: *allowed
   queue: *allowed
@@ -288,3 +288,5 @@ merge_protections:
       - label = backport-conflict
     success_conditions:
       - label != backport-conflict
+merge_protections_settings:
+  reporting_method: check-runs
