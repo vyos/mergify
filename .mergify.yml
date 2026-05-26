@@ -202,6 +202,15 @@ commands_restrictions:
           - sender=@vyos/maintainers
           - sender=@VyOS-Networks/maintainers
           - sender=vyosbot
+          # vyos-bot[bot] is the App identity that replaces the legacy vyosbot
+          # user PAT under Mirror Pipeline Rollout 1 (PAT → App migration).
+          # The App's GitHub login is literal `vyos-bot[bot]`. Single-quoted
+          # to keep YAML parsers from interpreting `[bot]` as flow-sequence
+          # syntax. Empirically caught when canary mirror PR vyos-bot[bot]
+          # @Mergifyio backport was rejected (VyOS-Networks/mirror-canary#6,
+          # 2026-05-26). `sender=vyosbot` retained for the 1b staggered
+          # migration window; removal deferred to 1b Task 12 post-PAT-revoke.
+          - 'sender=vyos-bot[bot]'
   copy: *allowed
   dequeue: *allowed
   queue: *allowed
