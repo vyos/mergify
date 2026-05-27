@@ -44,11 +44,13 @@ defaults:
   # single value below without redefining the whole queue.
   #
   # Why these specific defaults:
-  #   - update_method: rebase  -- keep enqueued PRs up to date by rebasing
-  #     on base, not merging base into the branch. Avoids the noisy
-  #     "Merge branch 'current' into <pr>" commits the manual flow creates
-  #     today and addresses Alex's ask in the kick-off meeting about auto-
-  #     rebasing PRs when other PRs land first.
+  #   - update_method: merge   -- keep enqueued PRs up to date by merging
+  #     the base branch in. `update_method` only accepts `merge` or
+  #     `rebase`; `rebase` rewrites commit SHAs and loses fork-PR support,
+  #     so `merge` is the fork-safe, SHA-preserving choice (consistent with
+  #     preferring the `update` action over `rebase` elsewhere in the
+  #     fleet). Addresses Alex's kick-off ask to auto-advance enqueued PRs
+  #     when other PRs land first.
   #   - merge_method: merge    -- preserve PR boundaries via a merge commit
   #     while individual commits remain linear on the base branch (the
   #     semi-linear pattern described at
@@ -68,7 +70,7 @@ defaults:
   # shape can graduate to central.
   # ------------------------------------------------------------------
   queue_rule:
-    update_method: rebase
+    update_method: merge
     merge_method: merge
     batch_size: 1
 
@@ -90,9 +92,9 @@ defaults:
 #   Label                       Backport branch     VyOS release line
 #   --------------------------  ------------------  ------------------
 #   backport/sagitta            sagitta             1.4.x (LTS)
-#   backport/circinus           circinus            1.5.x
-#   backport/equuleus           equuleus            1.6.x
-#   backport/crux               crux                1.3.x (legacy)
+#   backport/circinus           circinus            1.5.x (LTS)
+#   backport/equuleus           equuleus            1.3.x (LTS)
+#   backport/crux               crux                1.2.x (LTS)
 #
 # Convention for the source PR maintainer:
 #   - "Backport now" (today's behavior): post `@Mergifyio backport
