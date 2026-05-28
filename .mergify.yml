@@ -219,6 +219,59 @@ pull_request_rules:
           Pull requests targeting EOL release branches (`sagitta`, `crux`,
           `circinus`) are not accepted and have been closed automatically.
 
+  # ------------------------------------------------------------------
+  # Base-branch labeling — replaces vyos/.github:add-pr-labels.yml.
+  #
+  # `toggle:` adds the label when the base matches and removes it when
+  # the base changes. `-closed` is INTENTIONALLY omitted — including it
+  # would cause toggle to remove the label on PR close/merge, breaking
+  # historical query like `is:pr merged label:current`. Labels are kept
+  # post-merge for triage history; toggle only reacts to base-branch
+  # changes, not lifecycle state.
+  #
+  # The `labeler.yml` config in vyos/.github (consumed by the GHA being
+  # retired) covers four branches: equuleus, current, circinus, sagitta.
+  # ------------------------------------------------------------------
+  - name: Label PR with equuleus
+    description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
+    conditions: [base=equuleus]
+    actions: { label: { toggle: [equuleus] } }
+  - name: Label PR with current
+    description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
+    conditions: [base=current]
+    actions: { label: { toggle: [current] } }
+  - name: Label PR with circinus
+    description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
+    conditions: [base=circinus]
+    actions: { label: { toggle: [circinus] } }
+  - name: Label PR with sagitta
+    description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
+    conditions: [base=sagitta]
+    actions: { label: { toggle: [sagitta] } }
+
+  # ------------------------------------------------------------------
+  # Auto-assign PR author — replaces vyos/.github:assign-author.yml.
+  #
+  # The negative-regex condition `-author~=\[bot\]$` skips identities
+  # ending in [bot] (GitHub App-bot convention per data/github.md).
+  # The literal-author exclusions cover non-suffix identities in the
+  # current fleet (copilot-swe-agent, vyosbot legacy PAT).
+  # Maintenance: when a new non-[bot]-suffix bot identity joins the
+  # fleet, append `'author!=<login>'` here.
+  # ------------------------------------------------------------------
+  - name: Auto-assign PR author
+    description: Assign the PR author. Replaces vyos/.github:assign-author.yml.
+    conditions:
+      - -closed
+      - -merged
+      - '-author~=\[bot\]$'
+      - 'author!=copilot-swe-agent'
+      - 'author!=vyosbot'
+    actions:
+      assign:
+        add_users:
+          - "{{ author }}"
+
 commands_restrictions:
   # Both Maintainers teams are listed for defense-in-depth.
   #
