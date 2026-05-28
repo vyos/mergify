@@ -173,6 +173,52 @@ pull_request_rules:
     actions:
       update: {}
 
+  # ------------------------------------------------------------------
+  # Auto-close PRs targeting EOL release branches.
+  #
+  # Replaces vyos/vyos-1x:.github/workflows/pr-auto-close.yml, which only
+  # covered `sagitta`. Closes every PR (including Mergify-created
+  # backports) opened against `sagitta`, `crux`, or `circinus` in any
+  # vyos/* repo that extends this config, except the two excluded below.
+  #
+  # Excluded repos:
+  #   - vyos-documentation — still accepts per-branch docs maintenance
+  #     and backports to `sagitta` and `circinus`.
+  #   - vyos.vyos — Ansible Galaxy collection on `main`; listed
+  #     defensively so a future branch named `sagitta`/`crux`/`circinus`
+  #     would not be auto-closed.
+  #
+  # Mergify's `repository-name` attribute is the bare repo name (no
+  # org prefix). Since this central config is consumed only by vyos/*
+  # repos via `extends: mergify`, the bare name is unambiguous.
+  #
+  # Backport interaction: the `defaults.actions.backport` block above
+  # creates backport PRs targeting whatever branch a Maintainer asks
+  # for. If a Maintainer issues `@Mergifyio backport sagitta` on a
+  # vyos/* repo other than the two excluded ones, the backport PR is
+  # created and then immediately closed by this rule. That is the
+  # intended behavior — backports to EOL branches are not accepted.
+  # ------------------------------------------------------------------
+  - name: Auto-close PRs targeting EOL release branches
+    description: >
+      Close PRs (and Mergify-created backports) targeting the EOL release
+      branches sagitta, crux, and circinus. Excludes vyos-documentation
+      and vyos.vyos. Replaces vyos/vyos-1x:.github/workflows/pr-auto-close.yml.
+    conditions:
+      - '-closed'
+      - '-merged'
+      - or:
+          - base=sagitta
+          - base=crux
+          - base=circinus
+      - repository-name != vyos-documentation
+      - repository-name != vyos.vyos
+    actions:
+      close:
+        message: >
+          Pull requests targeting EOL release branches (`sagitta`, `crux`,
+          `circinus`) are not accepted and have been closed automatically.
+
 commands_restrictions:
   # Both Maintainers teams are listed for defense-in-depth.
   #
