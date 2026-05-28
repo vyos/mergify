@@ -297,5 +297,46 @@ merge_protections:
       - label = backport-conflict
     success_conditions:
       - label != backport-conflict
+
+  # Block merge while the `conflicts` label is set. The label is applied
+  # by the `Label conflicting pull requests` rule above (Mergify's
+  # built-in `conflict` attribute = GitHub's `mergeable_state == "dirty"`)
+  # and by vyos/.github:scripts/check-pr-conflicts.py (committed conflict
+  # markers on non-Mergify PRs). Either case must be resolved — by
+  # rebasing/merging the base, or by removing committed marker text —
+  # before merge can proceed. The script ignores PRs that already carry
+  # `backport-conflict` so the two labels stay disjoint in practice (see
+  # T8934).
+  - name: conflicts label must be absent to merge
+    description: >
+      Block merge while the conflicts label is present. The label is
+      auto-applied by the central `Label conflicting pull requests`
+      rule (git-level merge conflicts) and by
+      vyos/.github:scripts/check-pr-conflicts.py (committed conflict
+      markers on non-Mergify PRs). Must be cleared by resolving the
+      conflict.
+    if:
+      - label = conflicts
+    success_conditions:
+      - label != conflicts
+
+  # Block merge while the `invalid-title` label is set. The label is
+  # auto-toggled by the central `Flag T-ID format violation in PR title
+  # or commit messages` rule above when the PR title or any commit's
+  # first line does not match `[scope: ]T<digits>: <text>`. Promoting
+  # the existing label-only signal to a merge gate closes the gap where
+  # consumer repos that lacked a required `check-pr-message` status
+  # check could still merge a malformed PR.
+  - name: invalid-title label must be absent to merge
+    description: >
+      Block merge while the invalid-title label is present. The label
+      is auto-toggled by the `Flag T-ID format violation in PR title or
+      commit messages` rule when the PR title or any commit's first
+      line does not match `[scope: ]T<digits>: <text>`. Must be cleared
+      by amending the offending title/commit headline.
+    if:
+      - label = invalid-title
+    success_conditions:
+      - label != invalid-title
 merge_protections_settings:
   reporting_method: check-runs
