@@ -240,6 +240,18 @@ pull_request_rules:
     description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
     conditions: [base=current]
     actions: { label: { toggle: [current] } }
+  # rollout 1c (T8943): additive label rules for the renamed trunk names.
+  # `rolling` replaces `current` as the release-train trunk; `production`
+  # is the new default for non-release-train repos. The `current` rule
+  # above is retained through the bake period (removed in Task 7 cleanup).
+  - name: Label PR with rolling
+    description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
+    conditions: [base=rolling]
+    actions: { label: { toggle: [rolling] } }
+  - name: Label PR with production
+    description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
+    conditions: [base=production]
+    actions: { label: { toggle: [production] } }
   - name: Label PR with circinus
     description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
     conditions: [base=circinus]
