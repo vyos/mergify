@@ -449,5 +449,20 @@ merge_protections:
       - label = invalid-title
     success_conditions:
       - label != invalid-title
+
+  # Dormant for non-product repos (the `if:` never matches where the label is
+  # never set). Activated per-repo by the `Flag product T-ID format violation
+  # in PR title or commit messages` rule that product repos add to their own
+  # .github/mergify.yml (rollout T8966 / IS-529). Added BEFORE the per-repo
+  # rules so `invalid-task-id` blocks the moment a product repo sets it.
+  - name: invalid-task-id label must be absent to merge
+    description: >
+      Block merge while the invalid-task-id label is present. Set by the
+      per-repo product T-ID rule (product repos only); dormant where the
+      label is never applied.
+    if:
+      - label = invalid-task-id
+    success_conditions:
+      - label != invalid-task-id
 merge_protections_settings:
   reporting_method: check-runs
