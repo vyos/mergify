@@ -85,49 +85,49 @@ pull_request_rules:
           - conflicts
 
   # ------------------------------------------------------------------
-  # PR-message format rule — replaces vyos/.github:check-pr-message.yml
+  # Title + body sanity checks (T8966 — strict T-ID moved per-repo).
   #
-  # PR title AND every commit's first line must follow:
-  #   [optional `scope: ` prefix] T<digits>: <text>
-  # Examples:
-  #   T99999: make IPsec secure
-  #   dhcpv6: T8849: Add time-zone support for Kea DHCPv6
-  #
-  # The valid-form pattern:
-  #   ^(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+.*
-  #
-  # Mergify exposes only `commit_message` (full message, not headline-only),
-  # but the default Python `re` flags make `^` = start-of-string and `.*`
-  # non-newline-matching, so `^<pattern>` effectively checks the first line
-  # — equivalent to the original GHA's `messageHeadline` check.
-  #
-  # Because `commits[*]` returns true if ANY commit matches, and there is no
-  # `!~=` operator, the commit-message half uses a negative-lookahead regex
-  # that matches when at least one commit's first line does NOT conform.
-  #
-  # Title and commit-message checks live in a single rule with an `or`
-  # condition so a single `toggle: invalid-title` action manages the label
-  # in both directions. Two separate `toggle` rules pointing at the same
-  # label would issue conflicting add/remove operations when one surface
-  # conforms and the other does not (mergify#4 review): Mergify's `toggle`
-  # docs frame the action as a single-rule pattern that subsumes the
-  # earlier two-rule add/remove-with-inverse-conditions idiom.
+  # The strict `[scope: ]T<digits>: <text>` format check was REMOVED from
+  # this central config and relocated to each PRODUCT repo's own
+  # .github/mergify.yml (rule `Flag product T-ID format violation…`,
+  # toggling `invalid-task-id`). Non-product repos that extend this config
+  # no longer get T-ID enforcement; they get the generic, convention-
+  # agnostic title + body checks below instead. See https://vyos.dev/T8966.
   # ------------------------------------------------------------------
 
-  - name: Flag T-ID format violation in PR title or commit messages
+  - name: Flag malformed PR title
     description: >
-      PR title and every commit's first line must match `T<digits>: <text>`,
-      optionally prefixed with `scope: `. Replaces vyos/.github:check-pr-message.yml.
+      Generic, convention-agnostic title sanity check (every repo that extends
+      this config). Product-specific T-ID format is enforced per-repo via the
+      invalid-task-id rule. Toggles invalid-title when the title is empty/too
+      short or carries a WIP / do-not-merge marker.
     conditions:
       - '-closed'
       - '-merged'
       - or:
-          - '-title~=^(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+.*'
-          - 'commits[*].commit_message~=^(?!(([a-zA-Z0-9\-_.]+:\s)?)T\d+:\s+[^\s]+).*'
+          - '#title < 10'
+          - 'title~=(?i)\bwip\b'
+          - 'title~=(?i)do.not.merge'
     actions:
       label:
         toggle:
           - invalid-title
+
+  - name: Flag empty or too-short PR body
+    description: >
+      v1 minimal body check — PR description must contain some content.
+      Mergify's `body` strips comments, so this catches blank/near-blank
+      descriptions only; template-structure + checkbox matching is v2.
+      The threshold (80) sits below the smallest comment-stripped template
+      baseline (vyos-documentation, ~239) measured in Phase 0.
+    conditions:
+      - '-closed'
+      - '-merged'
+      - '#body < 80'
+    actions:
+      label:
+        toggle:
+          - invalid-body
 
   # ------------------------------------------------------------------
   # Opt-in auto-update — refresh PR with base when it falls behind.
@@ -432,23 +432,33 @@ merge_protections:
       - label != conflicts
 
   # Block merge while the `invalid-title` label is set. The label is
-  # auto-toggled by the central `Flag T-ID format violation in PR title
-  # or commit messages` rule above when the PR title or any commit's
-  # first line does not match `[scope: ]T<digits>: <text>`. Promoting
-  # the existing label-only signal to a merge gate closes the gap where
-  # consumer repos that lacked a required `check-pr-message` status
-  # check could still merge a malformed PR.
+  # auto-toggled by the central `Flag malformed PR title` rule above when
+  # the PR title is empty/too short or carries a WIP / do-not-merge marker.
+  # (Strict `[scope: ]T<digits>: <text>` enforcement moved to the per-repo
+  # `invalid-task-id` rule under T8966.)
   - name: invalid-title label must be absent to merge
     description: >
-      Block merge while the invalid-title label is present. The label
-      is auto-toggled by the `Flag T-ID format violation in PR title or
-      commit messages` rule when the PR title or any commit's first
-      line does not match `[scope: ]T<digits>: <text>`. Must be cleared
-      by amending the offending title/commit headline.
+      Block merge while the invalid-title label is present. The label is
+      auto-toggled by the `Flag malformed PR title` rule when the PR title
+      is empty/too short or carries a WIP / do-not-merge marker. Must be
+      cleared by fixing the title.
     if:
       - label = invalid-title
     success_conditions:
       - label != invalid-title
+
+  # Block merge while the `invalid-body` label is set. The label is
+  # auto-toggled by the central `Flag empty or too-short PR body` rule
+  # above when the PR description is blank/near-blank (T8966).
+  - name: invalid-body label must be absent to merge
+    description: >
+      Block merge while the invalid-body label is present. Auto-toggled by
+      the `Flag empty or too-short PR body` rule when the PR description is
+      blank or near-blank. Must be cleared by adding a description.
+    if:
+      - label = invalid-body
+    success_conditions:
+      - label != invalid-body
 
   # Dormant for non-product repos (the `if:` never matches where the label is
   # never set). Activated per-repo by the `Flag product T-ID format violation
