@@ -480,5 +480,24 @@ merge_protections:
       - label = invalid-task-id
     success_conditions:
       - label != invalid-task-id
+
+  # Block merge while a maintainer-applied WIP label is present. Unlike the
+  # auto-applied gates above, WIP is set by hand to hold a PR from merging
+  # (it has teeth once the Mergify Merge Protections check is made required —
+  # T8850 Cat 1). Bot authors are exempt via the if: scope so cross-org
+  # mirror-pipeline PRs (vyos-bot[bot]) to rolling are never held — they
+  # merge right away via the pipeline's admin-merge regardless.
+  - name: WIP label must be absent to merge
+    description: >
+      Block merge while the WIP label is present. Maintainers apply WIP by
+      hand to hold a PR. Bot authors (mirror pipeline vyos-bot, mergify) are
+      exempt so mirror PRs to rolling are never held.
+    if:
+      - label = WIP
+      - '-author~=\[bot\]$'
+      - 'author!=copilot-swe-agent'
+      - 'author!=vyosbot'
+    success_conditions:
+      - label != WIP
 merge_protections_settings:
   reporting_method: check-runs
