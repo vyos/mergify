@@ -236,20 +236,15 @@ pull_request_rules:
   # changes, not lifecycle state.
   #
   # The `labeler.yml` config in vyos/.github (consumed by the GHA being
-  # retired) covers four branches: equuleus, current, circinus, sagitta.
+  # retired) covers three branches: equuleus, circinus, sagitta.
   # ------------------------------------------------------------------
   - name: Label PR with equuleus
     description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
     conditions: [base=equuleus]
     actions: { label: { toggle: [equuleus] } }
-  - name: Label PR with current
-    description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
-    conditions: [base=current]
-    actions: { label: { toggle: [current] } }
   # rollout 1c (T8943): additive label rules for the renamed trunk names.
   # `rolling` replaces `current` as the release-train trunk; `production`
-  # is the new default for non-release-train repos. The `current` rule
-  # above is retained through the bake period (removed in Task 7 cleanup).
+  # is the new default for non-release-train repos.
   - name: Label PR with rolling
     description: Mirror base-branch as label. Replaces vyos/.github:add-pr-labels.yml.
     conditions: [base=rolling]
